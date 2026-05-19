@@ -4,8 +4,9 @@ import { GridStack } from 'gridstack';
 import styled from '@emotion/styled';
 import 'gridstack/dist/gridstack.css';
 
-// 사이드바 위젯 목록
+// 사이드바 위젯 목록 (고유 ID 포함)
 const SIDEBAR_ITEMS = [
+  { id: 'default-widget', title: '기본 위젯 (EC2)', w: 4, h: 3 },
   { id: 'widget-1', title: 'EC2 인스턴스', w: 4, h: 2 },
   { id: 'widget-2', title: 'S3 버킷 요약', w: 3, h: 3 },
   { id: 'widget-3', title: '결제 대시보드', w: 6, h: 2 },
@@ -61,9 +62,11 @@ function ShowcaseLayout() {
   const gridRef = useRef(null);
   const [width, setWidth] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // 현재 그리드에 올라와 있는 위젯 ID 관리
+  const [activeWidgetIds, setActiveWidgetIds] = useState(['default-widget']);
   const rootsRef = useRef(new Map());
 
-  // 탭 리사이징 기능
+  // 리사이즈 관찰자
   useEffect(() => {
     const handleResize = (entries) => {
       for (const entry of entries) {
@@ -75,8 +78,7 @@ function ShowcaseLayout() {
     return () => observer.disconnect();
   }, []);
 
-
-  // 첫 화면 배치
+  // GridStack 초기화 및 이벤트 설정
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -97,6 +99,7 @@ function ShowcaseLayout() {
       );
       gridRef.current = grid;
 
+
       const renderWidget = (el, title) => {
         let contentEl = el.querySelector('.grid-stack-item-content');
         if (!contentEl) {
@@ -104,30 +107,31 @@ function ShowcaseLayout() {
           contentEl.className = 'grid-stack-item-content';
           el.appendChild(contentEl);
         }
-
-        if (rootsRef.current.has(el)) {
-          rootsRef.current.get(el).unmount();
-        }
-
+        if (rootsRef.current.has(el)) rootsRef.current.get(el).unmount();
         const root = ReactDOM.createRoot(contentEl);
-        root.render(
-            <TabComponent
-                title={title}
-                onRemove={() => grid.removeWidget(el)}
-            />
-        );
+        root.render(<TabComponent title={title} onRemove={() => grid.removeWidget(el)} />);
         rootsRef.current.set(el, root);
       };
 
+      // 추가 이벤트: 라이브러리 -> 본화면 (목록에서 제거)
       grid.on('added', (event, items) => {
         items.forEach((item) => {
+          const id = item.el.getAttribute('data-id');
           const title = item.el.getAttribute('data-title') || '새 위젯';
+          if (id) {
+            setActiveWidgetIds(prev => Array.from(new Set([...prev, id])));
+          }
           renderWidget(item.el, title);
         });
       });
 
+      // 삭제 이벤트: 본화면 -> 라이브러리 (목록에 다시 등장)
       grid.on('removed', (event, items) => {
         items.forEach((item) => {
+          const id = item.el.getAttribute('data-id');
+          if (id) {
+            setActiveWidgetIds(prev => prev.filter(activeId => activeId !== id));
+          }
           if (rootsRef.current.has(item.el)) {
             rootsRef.current.get(item.el).unmount();
             rootsRef.current.delete(item.el);
@@ -135,9 +139,10 @@ function ShowcaseLayout() {
         });
       });
 
+      // 초기 정적 위젯 렌더링
       const staticItems = containerRef.current.querySelectorAll('.grid-stack-item');
       staticItems.forEach(el => {
-        renderWidget(el, el.getAttribute('data-title') || '기본 위젯');
+        renderWidget(el, el.getAttribute('data-title'));
       });
 
       GridStack.setupDragIn('.sidebar-item', {
@@ -156,7 +161,25 @@ function ShowcaseLayout() {
     };
   }, []);
 
-  // 폭에 따른 탭 컬럼 조절
+
+  // ★ 핵심 수정: 사이드바가 갱신될 때마다 드래그 인 설정을 다시 수행합니다.
+  useEffect(() => {
+    // 사이드바가 열려있고, 목록이 변경되었을 때 실행
+    if (isSidebarOpen) {
+      // React가 DOM을 업데이트할 시간을 주기 위해 잠시 대기 후 실행
+      const timer = setTimeout(() => {
+        GridStack.setupDragIn('.sidebar-item', {
+          revert: 'invalid',
+          scroll: true,
+          appendTo: 'body',
+          helper: 'clone',
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isSidebarOpen, activeWidgetIds]); // 사이드바 상태나 위젯 목록이 바뀔 때 재설정
+
+  // 컬럼 수 조절 로직
   useEffect(() => {
     const grid = gridRef.current;
     if (!grid || width === 0) return;
@@ -176,31 +199,47 @@ function ShowcaseLayout() {
         <MainLayout>
           <GridWrapper>
             <div className="grid-stack" ref={containerRef} style={{ minHeight: '600px' }}>
-              <div className="grid-stack-item" gs-w="3" gs-h="3" data-title="기본 위젯"></div>
+              {/* 기본 위젯에도 data-id 부여 */}
+              <div
+                  className="grid-stack-item"
+                  gs-w="3"
+                  gs-h="3"
+                  data-id="default-widget"
+                  data-title="기본 위젯"
+              ></div>
             </div>
           </GridWrapper>
 
           <Sidebar isOpen={isSidebarOpen}>
             <SidebarHeader>위젯 라이브러리</SidebarHeader>
             <SidebarContent>
-              {SIDEBAR_ITEMS.map((item) => (
-                  <div
-                      key={item.id}
-                      className="sidebar-item grid-stack-item"
-                      gs-w={item.w}
-                      gs-h={item.h}
-                      data-title={item.title}
-                      style={{ marginBottom: '10px' }}
-                  >
-                    <SidebarItemInner>
-                      <DragIcon>⠿</DragIcon>
-                      <div>
-                        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{item.title}</div>
-                        <div style={{ fontSize: '12px', color: '#888' }}>{item.w}x{item.h}</div>
+              {SIDEBAR_ITEMS
+                  // 현재 그리드에 없는 아이템만 사이드바에 표시
+                  .filter(item => !activeWidgetIds.includes(item.id))
+                  .map((item) => (
+                      <div
+                          key={item.id}
+                          className="sidebar-item grid-stack-item"
+                          gs-w={item.w}
+                          gs-h={item.h}
+                          data-id={item.id}
+                          data-title={item.title}
+                          style={{ marginBottom: '10px' }}
+                      >
+                        <SidebarItemInner>
+                          <DragIcon>⠿</DragIcon>
+                          <div>
+                            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{item.title}</div>
+                            <div style={{ fontSize: '12px', color: '#888' }}>{item.w}x{item.h}</div>
+                          </div>
+                        </SidebarItemInner>
                       </div>
-                    </SidebarItemInner>
+                  ))}
+              {SIDEBAR_ITEMS.filter(item => !activeWidgetIds.includes(item.id)).length === 0 && (
+                  <div style={{ textAlign: 'center', color: '#adb5bd', marginTop: '20px', fontSize: '13px' }}>
+                    모든 위젯이 추가되었습니다.
                   </div>
-              ))}
+              )}
             </SidebarContent>
           </Sidebar>
         </MainLayout>
@@ -208,8 +247,7 @@ function ShowcaseLayout() {
   );
 }
 
-// === Styled Components ===
-
+// === Styled Components (기존과 동일) ===
 const RootContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -258,7 +296,7 @@ const GridWrapper = styled.div`
     border: 1px solid #e9ecef;
     inset: 0 !important;
     overflow: visible !important;
-    display: flex; /* 내부 React 컴포넌트가 꽉 차도록 설정 */
+    display: flex;
   }
 
   .ui-resizable-se {
@@ -272,7 +310,7 @@ const GridWrapper = styled.div`
     opacity: 1 !important;
     visibility: visible !important;
     rotate: 45deg;
-    z-index: 30 !important; /* 푸터보다 위에 있도록 설정 */
+    z-index: 30 !important;
   }
 
   .ui-resizable-se::after {
@@ -285,7 +323,6 @@ const GridWrapper = styled.div`
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M5 11L11 5M9 11L11 9' stroke='%23879196' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: bottom right;
-    opacity: 1 !important;
   }
 `;
 
@@ -397,7 +434,7 @@ const ContentArea = styled.div`
   text-align: center;
   word-break: keep-all;
   user-select: none;
-  overflow: auto; /* 콘텐츠가 많아지면 스크롤 발생 */
+  overflow: auto;
 `;
 
 const Divider = styled.div`
