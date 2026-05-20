@@ -58,7 +58,6 @@ function ShowcaseLayout() {
   const [width, setWidth] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // 로컬 스토리지에서 초기 레이아웃 데이터 가져오기
   const [initialLayout] = useState(() => {
     const saved = localStorage.getItem('grid-layout');
     if (saved) {
@@ -146,6 +145,9 @@ function ShowcaseLayout() {
 
       grid.on('added', (event, items) => {
         items.forEach((item) => {
+          // 사이드바에서 드래그된 위젯의 잔상(clone)을 제거합니다.
+          item.el.innerHTML = '';
+
           const id = item.el.getAttribute('data-id');
           const title = item.el.getAttribute('data-title') || '새 위젯';
           if (id) {
