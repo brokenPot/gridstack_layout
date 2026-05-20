@@ -25,12 +25,17 @@ function TabComponent({ title, onRemove }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // 드래그 핸들을 제외한 다른 요소들에서 mousedown 이벤트 막아 드래그 제한
+  const stopDrag = (e) => {
+    e.stopPropagation();
+  };
+
   return (
       <TabItem>
         <WidgetHeader>
           <DragHandle className="drag-handle" title="드래그하여 이동" />
-          <WidgetTitle>{title}</WidgetTitle>
-          <MenuContainer ref={menuRef} className="menu-container">
+          <WidgetTitle onMouseDown={stopDrag}>{title}</WidgetTitle>
+          <MenuContainer ref={menuRef} onMouseDown={stopDrag}>
             <MenuButton onClick={() => setShowMenu(!showMenu)}>⋮</MenuButton>
             {showMenu && (
                 <Dropdown>
@@ -39,11 +44,11 @@ function TabComponent({ title, onRemove }) {
             )}
           </MenuContainer>
         </WidgetHeader>
-        <ContentArea>
+        <ContentArea onMouseDown={stopDrag}>
           <div style={{ color: '#adb5bd', fontSize: '12px' }}>위젯 데이터 영역</div>
         </ContentArea>
-        <Divider />
-        <WidgetFooter>
+        <Divider onMouseDown={stopDrag} />
+        <WidgetFooter onMouseDown={stopDrag}>
           <FooterLink href="https://aws.amazon.com/" target="_blank" rel="noopener noreferrer">
             상세 보기 &rsaquo;
           </FooterLink>
@@ -429,7 +434,7 @@ const MainLayout = styled.div` display: flex; flex: 1; position: relative; overf
 const TabItem = styled.div` width: 100%; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; `;
 const WidgetHeader = styled.div` height: 44px; position: relative; flex-shrink: 0; `;
 const DragHandle = styled.div` position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: grab !important; background-color: #f1f3f5; border-radius: 4px; color: #adb5bd; z-index: 10; &::before { content: '⠿'; font-size: 16px; } &:hover { background-color: #e9ecef; color: #495057; } `;
-const WidgetTitle = styled.div` position: absolute; top: 8px; left: 44px; right: 44px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #495057; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; user-select: none; `;
+const WidgetTitle = styled.div` position: absolute; top: 8px; left: 44px; right: 44px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #495057; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; `;
 const MenuContainer = styled.div` position: absolute; top: 8px; right: 8px; z-index: 20; `;
 const MenuButton = styled.button` background: none; border: none; width: 28px; height: 28px; font-size: 18px; cursor: pointer; color: #adb5bd; display: flex; align-items: center; justify-content: center; border-radius: 4px; &:hover { background: #f1f3f5; color: #495057; } `;
 const Dropdown = styled.div` position: absolute; right: 0; top: 32px; background: white; border: 1px solid #dee2e6; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 6px; min-width: 120px; overflow: hidden; z-index: 1000; `;
