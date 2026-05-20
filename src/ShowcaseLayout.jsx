@@ -30,7 +30,7 @@ function TabComponent({ title, onRemove }) {
         <WidgetHeader>
           <DragHandle className="drag-handle" title="드래그하여 이동" />
           <WidgetTitle>{title}</WidgetTitle>
-          <MenuContainer ref={menuRef}>
+          <MenuContainer ref={menuRef} className="menu-container">
             <MenuButton onClick={() => setShowMenu(!showMenu)}>⋮</MenuButton>
             {showMenu && (
                 <Dropdown>
@@ -57,6 +57,7 @@ function ShowcaseLayout() {
   const gridRef = useRef(null);
   const [width, setWidth] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isEditable, setIsEditable] = useState(true);
 
   const [initialLayout] = useState(() => {
     const saved = localStorage.getItem('grid-layout');
@@ -103,7 +104,9 @@ function ShowcaseLayout() {
             float: true,
             resizable: { handles: 'se', autoHide: false },
             minW: 2,
+            maxW: 12,
             minH: 2,
+            maxH: 8,
             alwaysShowPlaceholder: true,
             animate: true,
           },
@@ -145,8 +148,21 @@ function ShowcaseLayout() {
 
       grid.on('added', (event, items) => {
         items.forEach((item) => {
-          // 사이드바에서 드래그된 위젯의 잔상(clone)을 제거합니다.
-          item.el.innerHTML = '';
+          // 수정: innerHTML = '' 대신, 리사이즈 핸들은 남겨두고 잔상만 제거합니다.
+          Array.from(item.el.children).forEach(child => {
+            const className = child.className || '';
+            // GridStack이 생성한 리사이즈 핸들은 지우지 않습니다.
+            if (typeof className === 'string' && className.includes('ui-resizable')) {
+              return;
+            }
+            // 기존 콘텐츠 영역이 있다면 내용물만 지웁니다.
+            if (typeof className === 'string' && className.includes('grid-stack-item-content')) {
+              child.innerHTML = '';
+              return;
+            }
+            // 나머지 사이드바에서 딸려온 DOM(잔상)은 삭제합니다.
+            item.el.removeChild(child);
+          });
 
           const id = item.el.getAttribute('data-id');
           const title = item.el.getAttribute('data-title') || '새 위젯';
@@ -187,6 +203,16 @@ function ShowcaseLayout() {
   }, []);
 
   useEffect(() => {
+    if (gridRef.current) {
+      if (isEditable) {
+        gridRef.current.enable();
+      } else {
+        gridRef.current.disable();
+      }
+    }
+  }, [isEditable]);
+
+  useEffect(() => {
     if (isSidebarOpen) {
       const timer = setTimeout(() => {
         GridStack.setupDragIn('.sidebar-item', {
@@ -212,13 +238,23 @@ function ShowcaseLayout() {
     window.location.reload();
   };
 
+  const handleToggleEditMode = () => {
+    if (isEditable) {
+      setIsSidebarOpen(false);
+    }
+    setIsEditable(prev => !prev);
+  };
+
   return (
       <RootContainer>
         <Header>
           <div style={{ fontWeight: 'bold' }}>AWS Dashboard</div>
           <HeaderActions>
-            <ResetButton onClick={handleReset}>초기화</ResetButton>
-            <AddButton onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+            <EditModeButton onClick={handleToggleEditMode}>
+              {isEditable ? '수정 완료' : '레이아웃 수정'}
+            </EditModeButton>
+            <ResetButton onClick={handleReset} disabled={!isEditable}>초기화</ResetButton>
+            <AddButton onClick={() => setIsSidebarOpen(!isSidebarOpen)} disabled={!isEditable}>
               {isSidebarOpen ? '닫기' : '위젯 추가'}
             </AddButton>
           </HeaderActions>
@@ -226,7 +262,7 @@ function ShowcaseLayout() {
 
         <MainLayout>
           <GridWrapper>
-            <div className="grid-stack" ref={containerRef}>
+            <div className={`grid-stack ${!isEditable ? 'is-static' : ''}`} ref={containerRef}>
               {initialLayout.map(item => (
                 <div
                     key={item.id}
@@ -285,6 +321,12 @@ const GridWrapper = styled.div`
     background-color: rgba(0, 0, 0, 0.02);
     transition: all 0.2s ease;
   }
+  
+  .grid-stack.is-static .drag-handle,
+  .grid-stack.is-static .menu-container,
+  .grid-stack.is-static .ui-resizable-se {
+    display: none;
+  }
 
   .grid-stack-placeholder > .placeholder-content {
     background: #a8a8a8 !important;
@@ -332,8 +374,57 @@ const GridWrapper = styled.div`
 const RootContainer = styled.div` display: flex; flex-direction: column; height: 100vh; background-color: #f8f9fa; `;
 const Header = styled.div` background: #232f3e; color: white; padding: 0 20px; height: 56px; display: flex; justify-content: space-between; align-items: center; z-index: 1100; `;
 const HeaderActions = styled.div` display: flex; align-items: center; `;
-const ResetButton = styled.button` background: #6c757d; color: white; border: none; padding: 8px 16px; cursor: pointer; font-weight: bold; border-radius: 4px; margin-right: 10px; &:hover { background: #5a6268; } `;
-const AddButton = styled.button` background: #ec7211; color: white; border: none; padding: 8px 16px; cursor: pointer; font-weight: bold; border-radius: 4px; &:hover { background: #d6650a; } `;
+
+const EditModeButton = styled.button`
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: bold;
+  border-radius: 4px;
+  margin-right: 10px;
+  &:hover { background: #0069d9; }
+  &:disabled {
+    background: #5a6268;
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+`;
+
+const ResetButton = styled.button`
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: bold;
+  border-radius: 4px;
+  margin-right: 10px;
+  &:hover { background: #5a6268; }
+  &:disabled {
+    background: #5a6268;
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+`;
+
+const AddButton = styled.button`
+  background: #ec7211;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: bold;
+  border-radius: 4px;
+  &:hover { background: #d6650a; }
+  &:disabled {
+    background: #d6650a;
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+`;
+
 const MainLayout = styled.div` display: flex; flex: 1; position: relative; overflow: hidden; `;
 const TabItem = styled.div` width: 100%; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; `;
 const WidgetHeader = styled.div` height: 44px; position: relative; flex-shrink: 0; `;
