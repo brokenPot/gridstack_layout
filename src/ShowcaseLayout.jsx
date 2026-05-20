@@ -11,11 +11,19 @@ const SIDEBAR_ITEMS = [
   { id: 'widget-3', title: '결제 대시보드', w: 6, h: 2 },
 ];
 
+/**
+ * 탭 내용을 렌더링하는 컴포넌트.
+ * 
+ * @param {Object} props
+ * @param {string} props.title - 위젯 상단에 표시될 제목
+ * @param {Function} props.onRemove - 위젯 메뉴에서 '위젯 제거' 클릭 시 호출되는 콜백 함수
+ */
 function TabComponent({ title, onRemove }) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
+    // 메뉴 바깥을 클릭했을 때 메뉴를 닫기 위한 이벤트 핸들러
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setShowMenu(false);
@@ -25,7 +33,7 @@ function TabComponent({ title, onRemove }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 드래그 핸들을 제외한 다른 요소들에서 mousedown 이벤트 막아 드래그 제한
+  // 드래그 핸들을 제외한 다른 요소들에서 mousedown 이벤트 막아 의도치 않은 드래그 제한
   const stopDrag = (e) => {
     e.stopPropagation();
   };
@@ -57,13 +65,18 @@ function TabComponent({ title, onRemove }) {
   );
 }
 
+/**
+ * 대시보드 메인 레이아웃
+ * GridStack 초기화 사이드바 및 탭 배치.
+ */
 function ShowcaseLayout() {
-  const containerRef = useRef(null);
-  const gridRef = useRef(null);
-  const [width, setWidth] = useState(0);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isEditable, setIsEditable] = useState(true);
+  const containerRef = useRef(null); // GridStack이 적용될 컨테이너 DOM 참조
+  const gridRef = useRef(null); // GridStack 인스턴스 참조
+  const [width, setWidth] = useState(0); // 현재 화면 너비 (반응형 컬럼 조정을 위함)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // 사이드바 열림/닫힘 상태
+  const [isEditable, setIsEditable] = useState(true); // 레이아웃 편집 모드 (드래그/리사이즈 활성화 여부)
 
+  // 로컬 스토리지에서 저장된 레이아웃을 불러오거나 기본 레이아웃을 설정
   const [initialLayout] = useState(() => {
     const saved = localStorage.getItem('grid-layout');
     if (saved) {
@@ -81,9 +94,11 @@ function ShowcaseLayout() {
     ];
   });
 
+  // 현재 그리드에 배치된 위젯들의 ID 목록
   const [activeWidgetIds, setActiveWidgetIds] = useState(() => initialLayout.map(item => item.id));
-  const rootsRef = useRef(new Map());
+  const rootsRef = useRef(new Map()); // 인스턴스를 저장하여 메모리 누수 방지
 
+  // 화면 크기 변경 감지를 위한 ResizeObserver 설정
   useEffect(() => {
     const handleResize = (entries) => {
       for (const entry of entries) {
@@ -95,30 +110,33 @@ function ShowcaseLayout() {
     return () => observer.disconnect();
   }, []);
 
+  // GridStack 초기화 및 이벤트 리스너 등록
   useEffect(() => {
     if (!containerRef.current) return;
 
     if (!gridRef.current) {
+      // GridStack 인스턴스 생성
       const grid = GridStack.init(
           {
             cellHeight: 60,
             margin: 10,
-            handle: '.drag-handle',
-            acceptWidgets: true,
-            disableOneColumnMode: true,
-            float: true,
-            resizable: { handles: 'se', autoHide: false },
-            minW: 2,
-            maxW: 12,
-            minH: 2,
-            maxH: 8,
-            alwaysShowPlaceholder: true,
-            animate: true,
+            handle: '.drag-handle', // 드래그를 활성화할 CSS 셀렉터
+            acceptWidgets: true, // 외부(사이드바)에서 드래그 앤 드롭으로 위젯 추가 허용
+            disableOneColumnMode: true, // 모바일에서 강제로 1열 모드로 변하는 것을 방지
+            float: true, // 위젯들이 위로 빈 공간을 채우지 않고 자유롭게 배치되도록 설정
+            resizable: { handles: 'se', autoHide: false }, // 탭 우측 하단 리사이즈 핸들 설정
+            alwaysShowPlaceholder: true, // 드래그 중 배치 예정 위치 항상 표시
+            animate: true, // 이동/리사이즈 시 애니메이션 적용
           },
           containerRef.current
       );
       gridRef.current = grid;
 
+      /**
+       * GridStack 아이템 내부에 React 컴포넌트를 마운트하는 헬퍼 함수
+       * @param {HTMLElement} el - GridStack 위젯 DOM 요소
+       * @param {string} title - 위젯 제목
+       */
       const renderWidget = (el, title) => {
         let contentEl = el.querySelector('.grid-stack-item-content');
         if (!contentEl) {
@@ -132,6 +150,9 @@ function ShowcaseLayout() {
         rootsRef.current.set(el, root);
       };
 
+      /**
+       * 현재 그리드의 위젯 배치 상태를 로컬 스토리지에 저장하는 함수
+       */
       const saveLayout = () => {
         if (!gridRef.current) return;
         const layout = gridRef.current.engine.nodes.map(node => ({
@@ -151,21 +172,22 @@ function ShowcaseLayout() {
 
       grid.on('change', saveLayout);
 
+      // 새 위젯이 그리드에 추가되었을 때 발생하는 이벤트
       grid.on('added', (event, items) => {
         items.forEach((item) => {
-          // 수정: innerHTML = '' 대신, 리사이즈 핸들은 남겨두고 잔상만 제거합니다.
+          // 추가된 위젯에 동적으로 리사이징 제약 조건 적용 (최소/최대 너비 및 높이)
+          grid.update(item.el, { minW: 2, maxW: 8, minH: 2, maxH: 6 });
+          
+          // 사이드바에서 드래그해 올 때 생긴 잔여 DOM 요소 정리
           Array.from(item.el.children).forEach(child => {
             const className = child.className || '';
-            // GridStack이 생성한 리사이즈 핸들은 지우지 않습니다.
             if (typeof className === 'string' && className.includes('ui-resizable')) {
               return;
             }
-            // 기존 콘텐츠 영역이 있다면 내용물만 지웁니다.
             if (typeof className === 'string' && className.includes('grid-stack-item-content')) {
               child.innerHTML = '';
               return;
             }
-            // 나머지 사이드바에서 딸려온 DOM(잔상)은 삭제합니다.
             item.el.removeChild(child);
           });
 
@@ -179,6 +201,7 @@ function ShowcaseLayout() {
         saveLayout();
       });
 
+      // 위젯이 그리드에서 제거되었을 때 발생하는 이벤트
       grid.on('removed', (event, items) => {
         items.forEach((item) => {
           const id = item.el.getAttribute('data-id');
@@ -186,15 +209,17 @@ function ShowcaseLayout() {
             setActiveWidgetIds(prev => prev.filter(activeId => activeId !== id));
           }
           if (rootsRef.current.has(item.el)) {
-            rootsRef.current.get(item.el).unmount();
+            rootsRef.current.get(item.el).unmount(); // React 컴포넌트 언마운트 처리
             rootsRef.current.delete(item.el);
           }
         });
         saveLayout();
       });
 
+      // 초기 렌더링 시점에 존재하는 기본 위젯들을 초기화
       const staticItems = containerRef.current.querySelectorAll('.grid-stack-item');
       staticItems.forEach(el => {
+        grid.update(el, { minW: 2, maxW: 8, minH: 2, maxH: 6 }); // 기본 위젯에 리사이징 제약 적용
         renderWidget(el, el.getAttribute('data-title'));
       });
     }
@@ -207,6 +232,7 @@ function ShowcaseLayout() {
     };
   }, []);
 
+  // 편집 모드 상태 변경 시 GridStack 활성화/비활성화 처리
   useEffect(() => {
     if (gridRef.current) {
       if (isEditable) {
@@ -217,20 +243,26 @@ function ShowcaseLayout() {
     }
   }, [isEditable]);
 
+  // 사이드바가 열렸을 때 드래그 가능한 아이템 설정
   useEffect(() => {
     if (isSidebarOpen) {
       const timer = setTimeout(() => {
         GridStack.setupDragIn('.sidebar-item', {
-          revert: 'invalid',
+          revert: 'invalid', // 유효하지 않은 드롭 위치일 경우 원래 자리로 되돌아감
           scroll: false,
-          appendTo: 'body',
-          helper: 'clone',
+          appendTo: 'body', // 드래그 헬퍼 요소를 body에 추가하여 z-index 문제 방지
+          helper: (el) => {
+            const clone = el.cloneNode(true);
+            clone.style.zIndex = '100';
+            return clone;
+          },
         });
       }, 100);
       return () => clearTimeout(timer);
     }
   }, [isSidebarOpen, activeWidgetIds]);
 
+  // 반응형 레이아웃 처리: 브라우저 너비에 따라 GridStack의 전체 컬럼 수를 조정
   useEffect(() => {
     const grid = gridRef.current;
     if (!grid || width === 0) return;
@@ -238,14 +270,20 @@ function ShowcaseLayout() {
     if (grid.getColumn() !== targetColumn) grid.column(targetColumn, 'none');
   }, [width]);
 
+  /**
+   * 저장된 레이아웃을 초기화하고 페이지를 새로고침하는 함수
+   */
   const handleReset = () => {
     localStorage.removeItem('grid-layout');
     window.location.reload();
   };
 
+  /**
+   * 레이아웃 편집 모드를 토글하는 함수
+   */
   const handleToggleEditMode = () => {
     if (isEditable) {
-      setIsSidebarOpen(false);
+      setIsSidebarOpen(false); // 편집 모드 종료 시 사이드바도 함께 닫음
     }
     setIsEditable(prev => !prev);
   };
