@@ -57,7 +57,26 @@ function ShowcaseLayout() {
   const gridRef = useRef(null);
   const [width, setWidth] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeWidgetIds, setActiveWidgetIds] = useState(['default-widget']);
+
+  // 로컬 스토리지에서 초기 레이아웃 데이터 가져오기
+  const [initialLayout] = useState(() => {
+    const saved = localStorage.getItem('grid-layout');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed to parse layout from localStorage', e);
+      }
+    }
+    return [
+      { id: 'default-widget', title: '기본 위젯 (EC2)', w: 4, h: 3, x: 0, y: 0 }
+    ];
+  });
+
+  const [activeWidgetIds, setActiveWidgetIds] = useState(() => initialLayout.map(item => item.id));
   const rootsRef = useRef(new Map());
 
   useEffect(() => {
@@ -82,12 +101,11 @@ function ShowcaseLayout() {
             handle: '.drag-handle',
             acceptWidgets: true,
             disableOneColumnMode: true,
-
-            float: true, // false일 경우 탭 밀착 배치를 유도하는 파라미터
+            float: true,
             resizable: { handles: 'se', autoHide: false },
             minW: 2,
             minH: 2,
-            alwaysShowPlaceholder: true, // 플레이스홀더 반응성을 높이기 위한 옵션
+            alwaysShowPlaceholder: true,
             animate: true,
           },
           containerRef.current
@@ -107,6 +125,25 @@ function ShowcaseLayout() {
         rootsRef.current.set(el, root);
       };
 
+      const saveLayout = () => {
+        if (!gridRef.current) return;
+        const layout = gridRef.current.engine.nodes.map(node => ({
+          id: node.el.getAttribute('data-id'),
+          title: node.el.getAttribute('data-title'),
+          x: node.x,
+          y: node.y,
+          w: node.w,
+          h: node.h
+        }));
+        if (layout.length > 0) {
+          localStorage.setItem('grid-layout', JSON.stringify(layout));
+        } else {
+          localStorage.removeItem('grid-layout');
+        }
+      };
+
+      grid.on('change', saveLayout);
+
       grid.on('added', (event, items) => {
         items.forEach((item) => {
           const id = item.el.getAttribute('data-id');
@@ -116,6 +153,7 @@ function ShowcaseLayout() {
           }
           renderWidget(item.el, title);
         });
+        saveLayout();
       });
 
       grid.on('removed', (event, items) => {
@@ -129,6 +167,7 @@ function ShowcaseLayout() {
             rootsRef.current.delete(item.el);
           }
         });
+        saveLayout();
       });
 
       const staticItems = containerRef.current.querySelectorAll('.grid-stack-item');
@@ -145,14 +184,12 @@ function ShowcaseLayout() {
     };
   }, []);
 
-
-  // ★ 핵심 수정: 사이드바가 갱신될 때마다 드래그 인 설정을 다시 수행합니다.
   useEffect(() => {
     if (isSidebarOpen) {
       const timer = setTimeout(() => {
         GridStack.setupDragIn('.sidebar-item', {
           revert: 'invalid',
-          scroll: false, // 반응 속도를 위해 false 권장
+          scroll: false,
           appendTo: 'body',
           helper: 'clone',
         });
@@ -161,7 +198,6 @@ function ShowcaseLayout() {
     }
   }, [isSidebarOpen, activeWidgetIds]);
 
-  // 컬럼 수 조절 로직
   useEffect(() => {
     const grid = gridRef.current;
     if (!grid || width === 0) return;
@@ -169,25 +205,38 @@ function ShowcaseLayout() {
     if (grid.getColumn() !== targetColumn) grid.column(targetColumn, 'none');
   }, [width]);
 
+  const handleReset = () => {
+    localStorage.removeItem('grid-layout');
+    window.location.reload();
+  };
+
   return (
       <RootContainer>
         <Header>
           <div style={{ fontWeight: 'bold' }}>AWS Dashboard</div>
-          <AddButton onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-            {isSidebarOpen ? '닫기' : '위젯 추가'}
-          </AddButton>
+          <HeaderActions>
+            <ResetButton onClick={handleReset}>초기화</ResetButton>
+            <AddButton onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+              {isSidebarOpen ? '닫기' : '위젯 추가'}
+            </AddButton>
+          </HeaderActions>
         </Header>
 
         <MainLayout>
           <GridWrapper>
             <div className="grid-stack" ref={containerRef}>
-              <div
-                  className="grid-stack-item"
-                  gs-w="3"
-                  gs-h="3"
-                  data-id="default-widget"
-                  data-title="기본 위젯"
-              ></div>
+              {initialLayout.map(item => (
+                <div
+                    key={item.id}
+                    className="grid-stack-item"
+                    gs-x={item.x}
+                    gs-y={item.y}
+                    gs-w={item.w}
+                    gs-h={item.h}
+                    data-id={item.id}
+                    data-title={item.title}
+                ></div>
+              ))}
             </div>
           </GridWrapper>
 
@@ -195,7 +244,6 @@ function ShowcaseLayout() {
             <SidebarHeader>위젯 라이브러리</SidebarHeader>
             <SidebarContent>
               {SIDEBAR_ITEMS
-                  // 현재 그리드에 없는 아이템만 사이드바에 표시
                   .filter(item => !activeWidgetIds.includes(item.id))
                   .map((item) => (
                       <div
@@ -228,18 +276,13 @@ const GridWrapper = styled.div`
   padding: 15px;
   overflow-y: auto;
 
-  /* 드래그 가능한 메인 영역 테두리 */
   .grid-stack {
-    /* 최소 높이 설정: 위젯이 없어도 이 높이를 유지합니다 */
     min-height: 600px;
-
-    /* 요청하신 드래그 가능 영역 테두리 */
     border: 1px solid gray;
     border-radius: 8px;
-    background-color: rgba(0, 0, 0, 0.02); /* 영역이 있음을 보여주기 위한 가벼운 배경색 */
+    background-color: rgba(0, 0, 0, 0.02);
     transition: all 0.2s ease;
   }
-  /* 플레이스홀더(태깅 위치) 스타일 */
 
   .grid-stack-placeholder > .placeholder-content {
     background: #a8a8a8 !important;
@@ -286,6 +329,8 @@ const GridWrapper = styled.div`
 
 const RootContainer = styled.div` display: flex; flex-direction: column; height: 100vh; background-color: #f8f9fa; `;
 const Header = styled.div` background: #232f3e; color: white; padding: 0 20px; height: 56px; display: flex; justify-content: space-between; align-items: center; z-index: 1100; `;
+const HeaderActions = styled.div` display: flex; align-items: center; `;
+const ResetButton = styled.button` background: #6c757d; color: white; border: none; padding: 8px 16px; cursor: pointer; font-weight: bold; border-radius: 4px; margin-right: 10px; &:hover { background: #5a6268; } `;
 const AddButton = styled.button` background: #ec7211; color: white; border: none; padding: 8px 16px; cursor: pointer; font-weight: bold; border-radius: 4px; &:hover { background: #d6650a; } `;
 const MainLayout = styled.div` display: flex; flex: 1; position: relative; overflow: hidden; `;
 const TabItem = styled.div` width: 100%; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; `;
