@@ -266,8 +266,10 @@ function ShowcaseLayout() {
   useEffect(() => {
     const grid = gridRef.current;
     if (!grid || width === 0) return;
-    let targetColumn = width < 768 ? 4 : width < 1200 ? 8 : 12;
-    if (grid.getColumn() !== targetColumn) grid.column(targetColumn, 'none');
+    const targetColumn = width < 768 ? 4 : width < 1200 ? 8 : 12;
+    if (grid.getColumn() !== targetColumn) {
+      grid.column(targetColumn, 'compact'); // 위젯들이 빈자리를 찾아 촘촘하게 압축되어 재정렬
+    }
   }, [width]);
 
   /**
