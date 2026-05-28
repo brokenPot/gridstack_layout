@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import { GridStack } from 'gridstack';
 import styled from '@emotion/styled';
@@ -16,7 +16,7 @@ const SIDEBAR_ITEMS = [
 
 /**
  * 탭 내용을 렌더링하는 컴포넌트.
- * 
+ *
  * @param {Object} props
  * @param {string} props.title - 위젯 상단에 표시될 제목
  * @param {Function} props.onRemove - 위젯 메뉴에서 '위젯 제거' 클릭 시 호출되는 콜백 함수
@@ -27,17 +27,19 @@ function TabComponent({ title, onRemove }) {
 
   useEffect(() => {
     // 메뉴 바깥을 클릭했을 때 메뉴를 닫기 위한 이벤트 핸들러
-    const handleClickOutside = (e) => {
+    const handleClickOutside = e => {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setShowMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   // 드래그 핸들을 제외한 다른 요소들에서 mousedown 이벤트 막아 의도치 않은 드래그 제한
-  const stopDrag = (e) => {
+  const stopDrag = e => {
     e.stopPropagation();
   };
 
@@ -89,12 +91,11 @@ function ShowcaseLayout() {
           return parsed;
         }
       } catch (e) {
+        // eslint-disable-next-line no-console
         console.error('Failed to parse layout from localStorage', e);
       }
     }
-    return [
-      { id: 'default-widget', title: '기본 위젯 (EC2)', w: 4, h: 3, x: 0, y: 0 }
-    ];
+    return [{ id: 'default-widget', title: '기본 위젯 (EC2)', w: 4, h: 3, x: 0, y: 0 }];
   });
 
   // 현재 그리드에 배치된 위젯들의 ID 목록
@@ -103,19 +104,21 @@ function ShowcaseLayout() {
 
   // 화면 크기 변경 감지를 위한 ResizeObserver 설정
   useEffect(() => {
-    const handleResize = (entries) => {
-      for (const entry of entries) {
+    const handleResize = entries => {
+      entries.forEach(entry => {
         setWidth(entry.contentRect.width);
-      }
+      });
     };
     const observer = new ResizeObserver(handleResize);
     if (containerRef.current) observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   // GridStack 초기화 및 이벤트 리스너 등록
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) return undefined;
 
     if (!gridRef.current) {
       // GridStack 인스턴스 생성
@@ -131,7 +134,7 @@ function ShowcaseLayout() {
             alwaysShowPlaceholder: true, // 드래그 중 배치 예정 위치 항상 표시
             animate: true, // 이동/리사이즈 시 애니메이션 적용
           },
-          containerRef.current
+          containerRef.current,
       );
       gridRef.current = grid;
 
@@ -164,7 +167,7 @@ function ShowcaseLayout() {
           x: node.x,
           y: node.y,
           w: node.w,
-          h: node.h
+          h: node.h,
         }));
         if (layout.length > 0) {
           localStorage.setItem('grid-layout', JSON.stringify(layout));
@@ -177,21 +180,35 @@ function ShowcaseLayout() {
 
       // 새 위젯이 그리드에 추가되었을 때 발생하는 이벤트
       grid.on('added', (event, items) => {
-        items.forEach((item) => {
+        items.forEach(item => {
           // 추가된 위젯에 동적으로 리사이징 제약 조건 적용 (최소/최대 너비 및 높이)
           grid.update(item.el, { minW: 2, maxW: 8, minH: 2, maxH: 6 });
-          
+
           // 사이드바에서 드래그해 올 때 생긴 잔여 DOM 요소 정리
+          const childrenToKeep = [];
           Array.from(item.el.children).forEach(child => {
             const className = child.className || '';
-            if (typeof className === 'string' && className.includes('ui-resizable')) {
-              return;
-            }
-            if (typeof className === 'string' && className.includes('grid-stack-item-content')) {
+            const isContent =
+                typeof className === 'string' && className.includes('grid-stack-item-content');
+            const isResizable = typeof className === 'string' && className.includes('ui-resizable');
+
+            if (isContent) {
+              // eslint-disable-next-line no-param-reassign
               child.innerHTML = '';
-              return;
+              childrenToKeep.push(child);
+            } else if (isResizable) {
+              childrenToKeep.push(child);
             }
-            item.el.removeChild(child);
+          });
+
+          // 기존 자식들을 모두 제거
+          while (item.el.firstChild) {
+            item.el.removeChild(item.el.firstChild);
+          }
+
+          // 유지해야 할 자식들만 다시 추가
+          childrenToKeep.forEach(child => {
+            item.el.appendChild(child);
           });
 
           const id = item.el.getAttribute('data-id');
@@ -206,7 +223,7 @@ function ShowcaseLayout() {
 
       // 위젯이 그리드에서 제거되었을 때 발생하는 이벤트
       grid.on('removed', (event, items) => {
-        items.forEach((item) => {
+        items.forEach(item => {
           const id = item.el.getAttribute('data-id');
           if (id) {
             setActiveWidgetIds(prev => prev.filter(activeId => activeId !== id));
@@ -254,7 +271,7 @@ function ShowcaseLayout() {
           revert: 'invalid', // 유효하지 않은 드롭 위치일 경우 원래 자리로 되돌아감
           scroll: false,
           appendTo: 'body', // 드래그 헬퍼 요소를 body에 추가하여 z-index 문제 방지
-          helper: (el) => {
+          helper: el => {
             const clone = el.cloneNode(true);
             clone.style.zIndex = '100';
             return clone;
@@ -263,6 +280,7 @@ function ShowcaseLayout() {
       }, 100);
       return () => clearTimeout(timer);
     }
+    return () => {};
   }, [isSidebarOpen, activeWidgetIds]);
 
   // 반응형 레이아웃 처리: 브라우저 너비에 따라 GridStack의 전체 컬럼 수를 조정
@@ -301,7 +319,9 @@ function ShowcaseLayout() {
             <EditModeButton onClick={handleToggleEditMode}>
               {isEditable ? '잠금' : '잠금 해제'}
             </EditModeButton>
-            <ResetButton onClick={handleReset} disabled={!isEditable}>기본 레이아웃으로 재설정</ResetButton>
+            <ResetButton onClick={handleReset} disabled={!isEditable}>
+              기본 레이아웃으로 재설정
+            </ResetButton>
             <AddButton onClick={() => setIsSidebarOpen(!isSidebarOpen)} disabled={!isEditable}>
               {isSidebarOpen ? '닫기' : '위젯 추가'}
             </AddButton>
@@ -312,16 +332,16 @@ function ShowcaseLayout() {
           <GridWrapper isSidebarOpen={isSidebarOpen}>
             <div className={`grid-stack ${!isEditable ? 'is-static' : ''}`} ref={containerRef}>
               {initialLayout.map(item => (
-                <div
-                    key={item.id}
-                    className="grid-stack-item"
-                    gs-x={item.x}
-                    gs-y={item.y}
-                    gs-w={item.w}
-                    gs-h={item.h}
-                    data-id={item.id}
-                    data-title={item.title}
-                ></div>
+                  <div
+                      key={item.id}
+                      className="grid-stack-item"
+                      gs-x={item.x}
+                      gs-y={item.y}
+                      gs-w={item.w}
+                      gs-h={item.h}
+                      data-id={item.id}
+                      data-title={item.title}
+                  />
               ))}
             </div>
           </GridWrapper>
@@ -329,27 +349,27 @@ function ShowcaseLayout() {
           <Sidebar isOpen={isSidebarOpen}>
             <SidebarHeader>위젯 라이브러리</SidebarHeader>
             <SidebarContent>
-              {SIDEBAR_ITEMS
-                  .filter(item => !activeWidgetIds.includes(item.id))
-                  .map((item) => (
-                      <div
-                          key={item.id}
-                          className="sidebar-item grid-stack-item"
-                          gs-w={item.w}
-                          gs-h={item.h}
-                          data-id={item.id}
-                          data-title={item.title}
-                          style={{ marginBottom: '10px' }}
-                      >
-                        <SidebarItemInner>
-                          <DragIcon>⠿</DragIcon>
-                          <div>
-                            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{item.title}</div>
-                            <div style={{ fontSize: '12px', color: '#888' }}>{item.w}x{item.h}</div>
-                          </div>
-                        </SidebarItemInner>
+              {SIDEBAR_ITEMS.filter(item => !activeWidgetIds.includes(item.id)).map(item => (
+                  <div
+                      key={item.id}
+                      className="sidebar-item grid-stack-item"
+                      gs-w={item.w}
+                      gs-h={item.h}
+                      data-id={item.id}
+                      data-title={item.title}
+                      style={{ marginBottom: '10px' }}
+                  >
+                    <SidebarItemInner>
+                      <DragIcon>⠿</DragIcon>
+                      <div>
+                        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{item.title}</div>
+                        <div style={{ fontSize: '12px', color: '#888' }}>
+                          {item.w}x{item.h}
+                        </div>
                       </div>
-                  ))}
+                    </SidebarItemInner>
+                  </div>
+              ))}
             </SidebarContent>
           </Sidebar>
         </MainLayout>
@@ -370,7 +390,7 @@ const GridWrapper = styled.div`
     background-color: rgba(0, 0, 0, 0.02);
     transition: all 0.2s ease;
   }
-  
+
   .grid-stack.is-static .drag-handle,
   .grid-stack.is-static .menu-container,
   .grid-stack.is-static .ui-resizable-se {
@@ -420,9 +440,27 @@ const GridWrapper = styled.div`
   }
 `;
 
-const RootContainer = styled.div` width: 80%; display: flex; flex-direction: column; height: 100vh; border: 1px solid black `;
-const Header = styled.div`  color: white; padding: 0 20px; height: 56px; display: flex; justify-content: space-between; align-items: center; z-index: 1100;  color: #08060d`;
-const HeaderActions = styled.div` display: flex; align-items: center; `;
+const RootContainer = styled.div`
+  width: 80%;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  border: 1px solid black;
+`;
+const Header = styled.div`
+  color: white;
+  padding: 0 20px;
+  height: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1100;
+  color: #08060d;
+`;
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+`;
 
 const EditModeButton = styled.button`
   background: #007bff;
@@ -433,7 +471,9 @@ const EditModeButton = styled.button`
   font-weight: bold;
   border-radius: 4px;
   margin-right: 10px;
-  &:hover { background: #0069d9; }
+  &:hover {
+    background: #0069d9;
+  }
   &:disabled {
     background: #5a6268;
     cursor: not-allowed;
@@ -450,7 +490,9 @@ const ResetButton = styled.button`
   font-weight: bold;
   border-radius: 4px;
   margin-right: 10px;
-  &:hover { background: #5a6268; }
+  &:hover {
+    background: #5a6268;
+  }
   &:disabled {
     background: #5a6268;
     cursor: not-allowed;
@@ -466,7 +508,9 @@ const AddButton = styled.button`
   cursor: pointer;
   font-weight: bold;
   border-radius: 4px;
-  &:hover { background: #d6650a; }
+  &:hover {
+    background: #d6650a;
+  }
   &:disabled {
     background: #d6650a;
     cursor: not-allowed;
@@ -474,23 +518,191 @@ const AddButton = styled.button`
   }
 `;
 
-const MainLayout = styled.div` display: flex;  flex: 1; position: relative; overflow: hidden; `;
-const TabItem = styled.div` width: 100%; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; `;
-const WidgetHeader = styled.div` height: 44px; position: relative; flex-shrink: 0; `;
-const DragHandle = styled.div` position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: grab !important; background-color: #f1f3f5; border-radius: 4px; color: #adb5bd; z-index: 10; &::before { content: '⠿'; font-size: 16px; } &:hover { background-color: #e9ecef; color: #495057; } `;
-const WidgetTitle = styled.div` position: absolute; top: 8px; left: 44px; right: 44px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #495057; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; `;
-const MenuContainer = styled.div` position: absolute; top: 8px; right: 8px; z-index: 20; `;
-const MenuButton = styled.button` background: none; border: none; width: 28px; height: 28px; font-size: 18px; cursor: pointer; color: #adb5bd; display: flex; align-items: center; justify-content: center; border-radius: 4px; &:hover { background: #f1f3f5; color: #495057; } `;
-const Dropdown = styled.div` position: absolute; right: 0; top: 32px; background: white; border: 1px solid #dee2e6; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 6px; min-width: 120px; overflow: hidden; z-index: 1000; `;
-const DropdownItem = styled.div` padding: 10px 14px; font-size: 13px; cursor: pointer; color: #e03131; font-weight: 500; &:hover { background: #fff5f5; } `;
-const ContentArea = styled.div` flex: 1; display: flex; align-items: center; justify-content: center; padding: 10px; font-weight: 600; color: #343a40; text-align: center; word-break: keep-all; user-select: none; overflow: auto; `;
-const Divider = styled.div` height: 1px; background-color: #e9ecef; margin: 0 10px; `;
-const WidgetFooter = styled.div` height: 32px; display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; background-color: #fff; border-radius: 0 0 8px 8px; `;
-const FooterLink = styled.a` font-size: 11px; color: #007bff; text-decoration: none; font-weight: 600; &:hover { text-decoration: underline; } `;
-const Sidebar = styled.div` position: absolute; right: 0; top: 15px; bottom: 0;  width: 280px; background: white; box-shadow: -4px 0 15px rgba(0,0,0,0.08); transform: translateX(${props => (props.isOpen ? '0' : '100%')}); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1050; display: flex; flex-direction: column; `;
-const SidebarHeader = styled.div` padding: 20px; border-bottom: 1px solid #f1f3f5; font-weight: bold; font-size: 16px; `;
-const SidebarContent = styled.div` flex: 1; padding: 15px; overflow-y: auto; `;
-const SidebarItemInner = styled.div` padding: 12px; border: 1px solid #e9ecef; border-radius: 8px; background: white; display: flex; align-items: center; cursor: grab; transition: all 0.2s; &:hover { border-color: #ec7211; box-shadow: 0 4px 8px rgba(0,0,0,0.05); transform: translateY(-2px); } `;
-const DragIcon = styled.div` margin-right: 12px; color: #dee2e6; font-size: 18px; `;
+const MainLayout = styled.div`
+  display: flex;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+`;
+const TabItem = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+`;
+const WidgetHeader = styled.div`
+  height: 44px;
+  position: relative;
+  flex-shrink: 0;
+`;
+const DragHandle = styled.div`
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab !important;
+  background-color: #f1f3f5;
+  border-radius: 4px;
+  color: #adb5bd;
+  z-index: 10;
+  &::before {
+    content: '⠿';
+    font-size: 16px;
+  }
+  &:hover {
+    background-color: #e9ecef;
+    color: #495057;
+  }
+`;
+const WidgetTitle = styled.div`
+  position: absolute;
+  top: 8px;
+  left: 44px;
+  right: 44px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #495057;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+`;
+const MenuContainer = styled.div`
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+`;
+const MenuButton = styled.button`
+  background: none;
+  border: none;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  cursor: pointer;
+  color: #adb5bd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  &:hover {
+    background: #f1f3f5;
+    color: #495057;
+  }
+`;
+const Dropdown = styled.div`
+  position: absolute;
+  right: 0;
+  top: 32px;
+  background: white;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  min-width: 120px;
+  overflow: hidden;
+  z-index: 1000;
+`;
+const DropdownItem = styled.div`
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #e03131;
+  font-weight: 500;
+  &:hover {
+    background: #fff5f5;
+  }
+`;
+const ContentArea = styled.div`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  font-weight: 600;
+  color: #343a40;
+  text-align: center;
+  word-break: keep-all;
+  user-select: none;
+  overflow: auto;
+`;
+const Divider = styled.div`
+  height: 1px;
+  background-color: #e9ecef;
+  margin: 0 10px;
+`;
+const WidgetFooter = styled.div`
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+  background-color: #fff;
+  border-radius: 0 0 8px 8px;
+`;
+const FooterLink = styled.a`
+  font-size: 11px;
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 600;
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+const Sidebar = styled.div`
+  position: absolute;
+  right: 0;
+  top: 15px;
+  bottom: 0;
+  width: 280px;
+  background: white;
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.08);
+  transform: translateX(${props => (props.isOpen ? '0' : '100%')});
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+`;
+const SidebarHeader = styled.div`
+  padding: 20px;
+  border-bottom: 1px solid #f1f3f5;
+  font-weight: bold;
+  font-size: 16px;
+`;
+const SidebarContent = styled.div`
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+`;
+const SidebarItemInner = styled.div`
+  padding: 12px;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  background: white;
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  transition: all 0.2s;
+  &:hover {
+    border-color: #ec7211;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+  }
+`;
+const DragIcon = styled.div`
+  margin-right: 12px;
+  color: #dee2e6;
+  font-size: 18px;
+`;
 
 export default ShowcaseLayout;
