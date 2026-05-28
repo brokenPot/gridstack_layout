@@ -293,12 +293,12 @@ function ShowcaseLayout() {
   return (
       <RootContainer>
         <Header>
-          <div style={{ fontWeight: 'bold' }}>AWS Dashboard</div>
+          <div style={{ fontWeight: 'bold' }}>대시보드 홈</div>
           <HeaderActions>
             <EditModeButton onClick={handleToggleEditMode}>
-              {isEditable ? '수정 완료' : '레이아웃 수정'}
+              {isEditable ? '잠금' : '잠금 해제'}
             </EditModeButton>
-            <ResetButton onClick={handleReset} disabled={!isEditable}>초기화</ResetButton>
+            <ResetButton onClick={handleReset} disabled={!isEditable}>기본 레이아웃으로 재설정</ResetButton>
             <AddButton onClick={() => setIsSidebarOpen(!isSidebarOpen)} disabled={!isEditable}>
               {isSidebarOpen ? '닫기' : '위젯 추가'}
             </AddButton>
@@ -357,7 +357,6 @@ function ShowcaseLayout() {
 const GridWrapper = styled.div`
   flex: 1;
   padding: 15px;
-  overflow-y: auto;
 
   .grid-stack {
     min-height: 600px;
@@ -384,7 +383,7 @@ const GridWrapper = styled.div`
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
     border: 1px solid #e9ecef;
-    inset: 0 !important;
+    margin: 5px;
     overflow: visible !important;
     display: flex;
   }
@@ -392,8 +391,8 @@ const GridWrapper = styled.div`
   .ui-resizable-se {
     width: 12px !important;
     height: 12px !important;
-    right: 4px !important;
-    bottom: 4px !important;
+    right: 15px !important;
+    bottom: 15px !important;
     background: none !important;
     cursor: se-resize !important;
     display: block !important;
@@ -416,8 +415,8 @@ const GridWrapper = styled.div`
   }
 `;
 
-const RootContainer = styled.div` display: flex; flex-direction: column; height: 100vh; background-color: #f8f9fa; `;
-const Header = styled.div` background: #232f3e; color: white; padding: 0 20px; height: 56px; display: flex; justify-content: space-between; align-items: center; z-index: 1100; `;
+const RootContainer = styled.div` width: 80%; display: flex; flex-direction: column; height: 100vh; `;
+const Header = styled.div`  color: white; padding: 0 20px; height: 56px; display: flex; justify-content: space-between; align-items: center; z-index: 1100;  color: #08060d`;
 const HeaderActions = styled.div` display: flex; align-items: center; `;
 
 const EditModeButton = styled.button`
@@ -470,7 +469,7 @@ const AddButton = styled.button`
   }
 `;
 
-const MainLayout = styled.div` display: flex; flex: 1; position: relative; overflow: hidden; `;
+const MainLayout = styled.div` display: flex;  flex: 1; position: relative; overflow: hidden; `;
 const TabItem = styled.div` width: 100%; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; `;
 const WidgetHeader = styled.div` height: 44px; position: relative; flex-shrink: 0; `;
 const DragHandle = styled.div` position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: grab !important; background-color: #f1f3f5; border-radius: 4px; color: #adb5bd; z-index: 10; &::before { content: '⠿'; font-size: 16px; } &:hover { background-color: #e9ecef; color: #495057; } `;
