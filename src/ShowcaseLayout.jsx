@@ -9,6 +9,9 @@ const SIDEBAR_ITEMS = [
   { id: 'widget-1', title: 'EC2 인스턴스', w: 4, h: 2 },
   { id: 'widget-2', title: 'S3 버킷 요약', w: 3, h: 3 },
   { id: 'widget-3', title: '결제 대시보드', w: 6, h: 2 },
+  { id: 'widget-4', title: '기타1', w: 4, h: 2 },
+  { id: 'widget-5', title: '기타2', w: 4, h: 2 },
+  { id: 'widget-6', title: '기타3', w: 4, h: 2 },
 ];
 
 /**
@@ -306,7 +309,7 @@ function ShowcaseLayout() {
         </Header>
 
         <MainLayout>
-          <GridWrapper>
+          <GridWrapper isSidebarOpen={isSidebarOpen}>
             <div className={`grid-stack ${!isEditable ? 'is-static' : ''}`} ref={containerRef}>
               {initialLayout.map(item => (
                 <div
@@ -357,6 +360,8 @@ function ShowcaseLayout() {
 const GridWrapper = styled.div`
   flex: 1;
   padding: 15px;
+  margin-right: ${props => (props.isSidebarOpen ? '280px' : '0')};
+  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   .grid-stack {
     min-height: 600px;
@@ -415,7 +420,7 @@ const GridWrapper = styled.div`
   }
 `;
 
-const RootContainer = styled.div` width: 80%; display: flex; flex-direction: column; height: 100vh; `;
+const RootContainer = styled.div` width: 80%; display: flex; flex-direction: column; height: 100vh; border: 1px solid black `;
 const Header = styled.div`  color: white; padding: 0 20px; height: 56px; display: flex; justify-content: space-between; align-items: center; z-index: 1100;  color: #08060d`;
 const HeaderActions = styled.div` display: flex; align-items: center; `;
 
@@ -482,7 +487,7 @@ const ContentArea = styled.div` flex: 1; display: flex; align-items: center; jus
 const Divider = styled.div` height: 1px; background-color: #e9ecef; margin: 0 10px; `;
 const WidgetFooter = styled.div` height: 32px; display: flex; align-items: center; justify-content: center; position: relative; flex-shrink: 0; background-color: #fff; border-radius: 0 0 8px 8px; `;
 const FooterLink = styled.a` font-size: 11px; color: #007bff; text-decoration: none; font-weight: 600; &:hover { text-decoration: underline; } `;
-const Sidebar = styled.div` position: absolute; right: 0; top: 0; bottom: 0; width: 280px; background: white; box-shadow: -4px 0 15px rgba(0,0,0,0.08); transform: translateX(${props => (props.isOpen ? '0' : '100%')}); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1050; display: flex; flex-direction: column; `;
+const Sidebar = styled.div` position: absolute; right: 0; top: 15px; bottom: 0;  width: 280px; background: white; box-shadow: -4px 0 15px rgba(0,0,0,0.08); transform: translateX(${props => (props.isOpen ? '0' : '100%')}); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1050; display: flex; flex-direction: column; `;
 const SidebarHeader = styled.div` padding: 20px; border-bottom: 1px solid #f1f3f5; font-weight: bold; font-size: 16px; `;
 const SidebarContent = styled.div` flex: 1; padding: 15px; overflow-y: auto; `;
 const SidebarItemInner = styled.div` padding: 12px; border: 1px solid #e9ecef; border-radius: 8px; background: white; display: flex; align-items: center; cursor: grab; transition: all 0.2s; &:hover { border-color: #ec7211; box-shadow: 0 4px 8px rgba(0,0,0,0.05); transform: translateY(-2px); } `;
