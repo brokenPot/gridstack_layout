@@ -48,7 +48,7 @@ function TabComponent({ title, onRemove }) {
         <WidgetHeader>
           <DragHandle className="drag-handle" title="드래그하여 이동" />
           <WidgetTitle onMouseDown={stopDrag}>{title}</WidgetTitle>
-          <MenuContainer ref={menuRef} onMouseDown={stopDrag}>
+          <MenuContainer ref={menuRef} onMouseDown={stopDrag} className="menu-container">
             <MenuButton onClick={() => setShowMenu(!showMenu)}>⋮</MenuButton>
             {showMenu && (
                 <Dropdown>
@@ -77,11 +77,9 @@ function TabComponent({ title, onRemove }) {
 function ShowcaseLayout() {
   const containerRef = useRef(null); // GridStack이 적용될 컨테이너 DOM 참조
   const gridRef = useRef(null); // GridStack 인스턴스 참조
-  const headerRef = useRef(null); // Header 요소 참조
   const [width, setWidth] = useState(0); // 현재 화면 너비 (반응형 컬럼 조정을 위함)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // 사이드바 열림/닫힘 상태
   const [isEditable, setIsEditable] = useState(true); // 레이아웃 편집 모드 (드래그/리사이즈 활성화 여부)
-  const [isHeaderCompact, setIsHeaderCompact] = useState(false); // 헤더 컴팩트 레이아웃 여부
 
   // 로컬 스토리지에서 저장된 레이아웃을 불러오거나 기본 레이아웃을 설정
   const [initialLayout] = useState(() => {
@@ -104,7 +102,7 @@ function ShowcaseLayout() {
   const [activeWidgetIds, setActiveWidgetIds] = useState(() => initialLayout.map(item => item.id));
   const rootsRef = useRef(new Map()); // 인스턴스를 저장하여 메모리 누수 방지
 
-  // 화면 크기 변경 감지를 위한 ResizeObserver 설정 (Grid 컨테이너)
+  // 화면 크기 변경 감지를 위한 ResizeObserver 설정
   useEffect(() => {
     const handleResize = entries => {
       entries.forEach(entry => {
@@ -113,25 +111,6 @@ function ShowcaseLayout() {
     };
     const observer = new ResizeObserver(handleResize);
     if (containerRef.current) observer.observe(containerRef.current);
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
-  // Header 컴포넌트 크기 감지를 위한 ResizeObserver 설정
-  useEffect(() => {
-    const handleHeaderResize = entries => {
-      for (let entry of entries) {
-        // 헤더 너비가 768px 미만일 때 컴팩트 모드 활성화
-        if (entry.contentRect.width < 768) {
-          setIsHeaderCompact(true);
-        } else {
-          setIsHeaderCompact(false);
-        }
-      }
-    };
-    const observer = new ResizeObserver(handleHeaderResize);
-    if (headerRef.current) observer.observe(headerRef.current);
     return () => {
       observer.disconnect();
     };
@@ -150,7 +129,7 @@ function ShowcaseLayout() {
             handle: '.drag-handle', // 드래그를 활성화할 CSS 셀렉터
             acceptWidgets: true, // 외부(사이드바)에서 드래그 앤 드롭으로 위젯 추가 허용
             disableOneColumnMode: true, // 모바일에서 강제로 1열 모드로 변하는 것을 방지
-            float: true, // 위젯들이 위로 빈 공간을 채우지 않고 자유롭게 배치되도록 설정
+            float: false, // true면 위젯들이 위로 빈 공간을 채우지 않고 자유롭게 배치되도록 설정
             resizable: { handles: 'se', autoHide: false }, // 탭 우측 하단 리사이즈 핸들 설정
             alwaysShowPlaceholder: true, // 드래그 중 배치 예정 위치 항상 표시
             animate: true, // 이동/리사이즈 시 애니메이션 적용
@@ -334,16 +313,16 @@ function ShowcaseLayout() {
 
   return (
       <RootContainer>
-        <Header ref={headerRef} isCompact={isHeaderCompact}>
-          <div style={{ fontWeight: 'bold' }}>대시보드 홈</div>
-          <HeaderActions isCompact={isHeaderCompact}>
-            <EditModeButton onClick={handleToggleEditMode} isCompact={isHeaderCompact}>
+        <Header>
+          <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>대시보드 홈</div>
+          <HeaderActions>
+            <EditModeButton onClick={handleToggleEditMode}>
               {isEditable ? '잠금' : '잠금 해제'}
             </EditModeButton>
-            <ResetButton onClick={handleReset} disabled={!isEditable} isCompact={isHeaderCompact}>
+            <ResetButton onClick={handleReset} disabled={!isEditable}>
               초기화
             </ResetButton>
-            <AddButton onClick={() => setIsSidebarOpen(!isSidebarOpen)} disabled={!isEditable} isCompact={isHeaderCompact}>
+            <AddButton onClick={() => setIsSidebarOpen(!isSidebarOpen)} disabled={!isEditable}>
               {isSidebarOpen ? '닫기' : '위젯 추가'}
             </AddButton>
           </HeaderActions>
@@ -470,16 +449,14 @@ const RootContainer = styled.div`
 `;
 
 const Header = styled.div`
-  padding: ${props => (props.isCompact ? '10px 20px' : '0 20px')};
+  padding: 0 20px;
   min-height: 56px;
   display: flex;
-  justify-content: ${props => (props.isCompact ? 'flex-start' : 'space-between')};
-  align-items: ${props => (props.isCompact ? 'flex-start' : 'center')};
-  flex-direction: ${props => (props.isCompact ? 'column' : 'row')};
-  gap: ${props => (props.isCompact ? '10px' : '0')};
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
   z-index: 1100;
   color: #08060d;
-  flex-wrap: wrap;
 `;
 
 const HeaderActions = styled.div`
@@ -487,20 +464,17 @@ const HeaderActions = styled.div`
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  width: ${props => (props.isCompact ? '100%' : 'auto')};
-  justify-content: ${props => (props.isCompact ? 'flex-start' : 'flex-end')};
+  justify-content: flex-end;
 `;
 
 const EditModeButton = styled.button`
   background: #007bff;
   color: white;
   border: none;
-  padding: ${props => (props.isCompact ? '6px 12px' : '8px 16px')};
+  padding: 8px 16px;
   cursor: pointer;
   font-weight: bold;
   border-radius: 4px;
-  font-size: ${props => (props.isCompact ? '12px' : '14px')};
-  flex: ${props => (props.isCompact ? '1' : 'none')};
   &:hover {
     background: #0069d9;
   }
@@ -515,12 +489,10 @@ const ResetButton = styled.button`
   background: #6c757d;
   color: white;
   border: none;
-  padding: ${props => (props.isCompact ? '6px 12px' : '8px 16px')};
+  padding: 8px 16px;
   cursor: pointer;
   font-weight: bold;
   border-radius: 4px;
-  font-size: ${props => (props.isCompact ? '12px' : '14px')};
-  flex: ${props => (props.isCompact ? '1' : 'none')};
   &:hover {
     background: #5a6268;
   }
@@ -535,12 +507,10 @@ const AddButton = styled.button`
   background: #ec7211;
   color: white;
   border: none;
-  padding: ${props => (props.isCompact ? '6px 12px' : '8px 16px')};
+  padding: 8px 16px;
   cursor: pointer;
   font-weight: bold;
   border-radius: 4px;
-  font-size: ${props => (props.isCompact ? '12px' : '14px')};
-  flex: ${props => (props.isCompact ? '1' : 'none')};
   &:hover {
     background: #d6650a;
   }
