@@ -4,16 +4,6 @@ import { GridStack } from 'gridstack';
 import styled from '@emotion/styled';
 import 'gridstack/dist/gridstack.css';
 
-const SIDEBAR_ITEMS = [
-  { id: 'default-widget', title: '기본 위젯 (EC2)', w: 4, h: 3 },
-  { id: 'widget-1', title: 'EC2 인스턴스', w: 4, h: 2 },
-  { id: 'widget-2', title: 'S3 버킷 요약', w: 3, h: 3 },
-  { id: 'widget-3', title: '결제 대시보드', w: 6, h: 2 },
-  { id: 'widget-4', title: '기타1', w: 4, h: 2 },
-  { id: 'widget-5', title: '기타2', w: 4, h: 2 },
-  { id: 'widget-6', title: '기타3', w: 4, h: 2 },
-];
-
 /**
  * 탭 내용을 렌더링하는 컴포넌트.
  *
@@ -74,10 +64,10 @@ function TabComponent({ title, onRemove }) {
  * 대시보드 메인 레이아웃
  * GridStack 초기화 사이드바 및 탭 배치.
  */
-function ShowcaseLayout() {
+function Dashboard({ width, height, title, currentTabs, sidebarTabs }) {
   const containerRef = useRef(null); // GridStack이 적용될 컨테이너 DOM 참조
   const gridRef = useRef(null); // GridStack 인스턴스 참조
-  const [width, setWidth] = useState(0); // 현재 화면 너비 (반응형 컬럼 조정을 위함)
+  const [dashboardWidth, setDashboardWidth] = useState(0); // 현재 화면 너비 (반응형 컬럼 조정을 위함)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // 사이드바 열림/닫힘 상태
   const [isEditable, setIsEditable] = useState(true); // 레이아웃 편집 모드 (드래그/리사이즈 활성화 여부)
 
@@ -95,7 +85,7 @@ function ShowcaseLayout() {
         console.error('Failed to parse layout from localStorage', e);
       }
     }
-    return [{ id: 'default-widget', title: '기본 위젯 (EC2)', w: 4, h: 3, x: 0, y: 0 }];
+    return currentTabs;
   });
 
   // 현재 그리드에 배치된 위젯들의 ID 목록
@@ -106,7 +96,7 @@ function ShowcaseLayout() {
   useEffect(() => {
     const handleResize = entries => {
       entries.forEach(entry => {
-        setWidth(entry.contentRect.width);
+        setDashboardWidth(entry.contentRect.width);
       });
     };
     const observer = new ResizeObserver(handleResize);
@@ -143,7 +133,7 @@ function ShowcaseLayout() {
        * @param {HTMLElement} el - GridStack 위젯 DOM 요소
        * @param {string} title - 위젯 제목
        */
-      const renderWidget = (el, title) => {
+      const renderWidget = (el, dataTitle) => {
         let contentEl = el.querySelector('.grid-stack-item-content');
         if (!contentEl) {
           contentEl = document.createElement('div');
@@ -152,7 +142,7 @@ function ShowcaseLayout() {
         }
         if (rootsRef.current.has(el)) rootsRef.current.get(el).unmount();
         const root = ReactDOM.createRoot(contentEl);
-        root.render(<TabComponent title={title} onRemove={() => grid.removeWidget(el)} />);
+        root.render(<TabComponent title={dataTitle} onRemove={() => grid.removeWidget(el)} />);
         rootsRef.current.set(el, root);
       };
 
@@ -212,11 +202,11 @@ function ShowcaseLayout() {
           });
 
           const id = item.el.getAttribute('data-id');
-          const title = item.el.getAttribute('data-title') || '새 위젯';
+          const dataTitle = item.el.getAttribute('data-title') || '새 위젯';
           if (id) {
             setActiveWidgetIds(prev => Array.from(new Set([...prev, id])));
           }
-          renderWidget(item.el, title);
+          renderWidget(item.el, dataTitle);
         });
         saveLayout();
       });
@@ -286,19 +276,29 @@ function ShowcaseLayout() {
   // 반응형 레이아웃 처리: 브라우저 너비에 따라 GridStack의 전체 컬럼 수를 조정
   useEffect(() => {
     const grid = gridRef.current;
-    if (!grid || width === 0) return;
-    const targetColumn = width < 768 ? 4 : width < 1200 ? 8 : 12;
+    if (!grid || dashboardWidth === 0) return;
+    let targetColumn;
+    if (dashboardWidth < 768) {
+      targetColumn = 4;
+    } else if (dashboardWidth < 1200) {
+      targetColumn = 8;
+    } else {
+      targetColumn = 12;
+    }
     if (grid.getColumn() !== targetColumn) {
       grid.column(targetColumn, 'compact'); // 위젯들이 빈자리를 찾아 촘촘하게 압축되어 재정렬
     }
-  }, [width]);
+  }, [dashboardWidth]);
 
   /**
    * 저장된 레이아웃을 초기화하고 페이지를 새로고침하는 함수
    */
   const handleReset = () => {
-    localStorage.removeItem('grid-layout');
-    window.location.reload();
+    // eslint-disable-next-line no-alert
+    if (window.confirm('정말 초기화하시겠습니까?')) {
+      localStorage.removeItem('grid-layout');
+      window.location.reload();
+    }
   };
 
   /**
@@ -312,9 +312,9 @@ function ShowcaseLayout() {
   };
 
   return (
-      <RootContainer>
+      <RootContainer width={width} height={height}>
         <Header>
-          <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>대시보드 홈</div>
+          <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{title}</div>
           <HeaderActions>
             <EditModeButton onClick={handleToggleEditMode}>
               {isEditable ? '잠금' : '잠금 해제'}
@@ -329,7 +329,7 @@ function ShowcaseLayout() {
         </Header>
 
         <MainLayout>
-          <GridWrapper isSidebarOpen={isSidebarOpen}>
+          <GridWrapper>
             <div className={`grid-stack ${!isEditable ? 'is-static' : ''}`} ref={containerRef}>
               {initialLayout.map(item => (
                   <div
@@ -347,30 +347,34 @@ function ShowcaseLayout() {
           </GridWrapper>
 
           <Sidebar isOpen={isSidebarOpen}>
-            <SidebarHeader>위젯 라이브러리</SidebarHeader>
-            <SidebarContent>
-              {SIDEBAR_ITEMS.filter(item => !activeWidgetIds.includes(item.id)).map(item => (
-                  <div
-                      key={item.id}
-                      className="sidebar-item grid-stack-item"
-                      gs-w={item.w}
-                      gs-h={item.h}
-                      data-id={item.id}
-                      data-title={item.title}
-                      style={{ marginBottom: '10px' }}
-                  >
-                    <SidebarItemInner>
-                      <DragIcon>⠿</DragIcon>
-                      <div>
-                        <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{item.title}</div>
-                        <div style={{ fontSize: '12px', color: '#888' }}>
-                          {item.w}x{item.h}
+            <SidebarInner>
+              <SidebarHeader>위젯 라이브러리</SidebarHeader>
+              <SidebarContent>
+                {sidebarTabs
+                    .filter(item => !activeWidgetIds.includes(item.id))
+                    .map(item => (
+                        <div
+                            key={item.id}
+                            className="sidebar-item grid-stack-item"
+                            gs-w={item.w}
+                            gs-h={item.h}
+                            data-id={item.id}
+                            data-title={item.title}
+                            style={{ marginBottom: '10px' }}
+                        >
+                          <SidebarItemInner>
+                            <DragIcon>⠿</DragIcon>
+                            <div>
+                              <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{item.title}</div>
+                              <div style={{ fontSize: '12px', color: '#888' }}>
+                                {item.w}x{item.h}
+                              </div>
+                            </div>
+                          </SidebarItemInner>
                         </div>
-                      </div>
-                    </SidebarItemInner>
-                  </div>
-              ))}
-            </SidebarContent>
+                    ))}
+              </SidebarContent>
+            </SidebarInner>
           </Sidebar>
         </MainLayout>
       </RootContainer>
@@ -380,8 +384,6 @@ function ShowcaseLayout() {
 const GridWrapper = styled.div`
   flex: 1;
   padding: 15px;
-  margin-right: ${props => (props.isSidebarOpen ? '280px' : '0')};
-  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   .grid-stack {
     min-height: 600px;
@@ -441,20 +443,21 @@ const GridWrapper = styled.div`
 `;
 
 const RootContainer = styled.div`
-  width: 80%;
+  width: ${props => (props.width ? `${props.width}` : 'auto')};
   display: flex;
   flex-direction: column;
-  height: 100vh;
   border: 1px solid black;
+  min-height: ${props => (props.height ? `${props.height}` : 'auto')};
 `;
 
 const Header = styled.div`
-  padding: 0 20px;
+  padding: 10px 20px;
   min-height: 56px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
+  gap: 10px 20px;
   z-index: 1100;
   color: #08060d;
 `;
@@ -525,7 +528,6 @@ const MainLayout = styled.div`
   display: flex;
   flex: 1;
   position: relative;
-  overflow: hidden;
 `;
 const TabItem = styled.div`
   width: 100%;
@@ -663,19 +665,41 @@ const FooterLink = styled.a`
   }
 `;
 const Sidebar = styled.div`
-  position: absolute;
-  right: 0;
+  position: sticky;
   top: 15px;
-  bottom: 0;
-  width: 280px;
+  align-self: flex-start;
+  height: 500px;
+  //height: calc(100vh - 71px);
   background: white;
-  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.08);
-  transform: translateX(${props => (props.isOpen ? '0' : '100%')});
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: ${props => (props.isOpen ? '-4px 0 15px rgba(0, 0, 0, 0.08)' : 'none')};
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1050;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  width: ${props => (props.isOpen ? '280px' : '0')};
+
+  @media (max-width: 768px) {
+    width: ${props => (props.isOpen ? '200px' : '0')};
+  }
 `;
+
+const SidebarInner = styled.div`
+  width: 280px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid red;
+  box-sizing: border-box;
+
+  @media (max-width: 768px) {
+    width: 200px;
+    min-width: 200px;
+  }
+`;
+
 const SidebarHeader = styled.div`
   padding: 20px;
   border-bottom: 1px solid #f1f3f5;
@@ -708,4 +732,4 @@ const DragIcon = styled.div`
   font-size: 18px;
 `;
 
-export default ShowcaseLayout;
+export default Dashboard;
