@@ -1,7 +1,9 @@
+import React, { useState, useEffect } from "react";
 import Dashboard from "./Dashboard.jsx";
 import styled from "@emotion/styled";
 
-function App() {
+// api 모킹 데이터
+const fetchDashboardData = async () => {
   const DEFAULT_ITEMS = [
     { id: 'default-widget', title: '기본 위젯 (EC2)', w: 4, h: 3, x: 0, y: 0 },
   ];
@@ -22,18 +24,46 @@ function App() {
     { id: 'widget-12', title: '기타9', w: 4, h: 2 },
   ];
 
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  return {
+    defaultItems: DEFAULT_ITEMS,
+    sidebarItems: SIDEBAR_ITEMS,
+  };
+};
+
+function App() {
+  const [loading, setLoading] = useState(true);
+  const [defaultItems, setDefaultItems] = useState([]);
+  const [sidebarItems, setSidebarItems] = useState([]);
+
+  // api 호출 방식 모킹
+  useEffect(() => {
+    const loadData = async () => {
+      const { defaultItems, sidebarItems } = await fetchDashboardData();
+      setDefaultItems(defaultItems);
+      setSidebarItems(sidebarItems);
+      setLoading(false);
+    };
+
+    loadData();
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <AppWrapper>
-    <Dashboard
+      <Dashboard
         width="800px"
         height="400px"
         title="SQL 대시보드"
-        currentTabs={DEFAULT_ITEMS}
-        sidebarTabs={SIDEBAR_ITEMS}
-    />
+        currentTabs={defaultItems}
+        sidebarTabs={sidebarItems}
+      />
     </AppWrapper>
-  )
+  );
 }
 
 const AppWrapper = styled.div`
@@ -42,5 +72,4 @@ const AppWrapper = styled.div`
   width: 100%;
 `;
 
-
-export default App
+export default App;
